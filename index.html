@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Retro Snake | Ultimate Console</title>
+    <title>Retro Snake | Zero Lag Edition</title>
     <style>
         :root { 
             --retro-bg: #808080; 
@@ -76,7 +76,6 @@
             height: auto;
         }
 
-        /* --- CONTROLS --- */
         .controls-layer {
             margin-top: 25px;
             display: flex;
@@ -237,7 +236,9 @@
         let inputQueue = [];
         let highStore = localStorage.getItem('snake_hi') || 0;
         hiScoreEl.innerText = highStore;
-        const moveInterval = 140;
+        
+        // Speed slightly increased for better mobile responsiveness
+        const moveInterval = 130; 
 
         const colorFilters = {
             charcoal: "grayscale(1) brightness(0.6) contrast(1.2)",
@@ -267,7 +268,8 @@
             if (!gameRunning || !firstMoveMade) return;
             isPaused = !isPaused;
             document.getElementById("pauseUI").style.display = isPaused ? "block" : "none";
-            document.getElementById("deskPause").innerText = isPaused ? "RESUME (SPACE)" : "PAUSE (SPACE)";
+            const deskBtn = document.getElementById("deskPause");
+            if(deskBtn) deskBtn.innerText = isPaused ? "RESUME (SPACE)" : "PAUSE (SPACE)";
         }
 
         function init() {
@@ -278,7 +280,7 @@
             document.getElementById("gameOverUI").style.display = "none";
             document.getElementById("settingsUI").style.display = "none";
             document.getElementById("pauseUI").style.display = "none";
-            goldFood = null; lastTickTime = 0;
+            goldFood = null; lastTickTime = performance.now();
             spawnFood();
             requestAnimationFrame(mainLoop);
         }
@@ -377,31 +379,57 @@
         function handleInput(nDx, nDy) {
             if (!gameRunning || isPaused) return;
             const last = inputQueue.length > 0 ? inputQueue[inputQueue.length - 1] : { dx, dy };
-            if ((nDx !== 0 && nDx === -last.dx) || (nDy !== 0 && nDy === -last.dy)) return;
-            if (inputQueue.length < 3) inputQueue.push({ dx: nDx, dy: nDy });
-            if (!firstMoveMade) firstMoveMade = true;
+            
+            // Prevent 180-degree turns and duplicate inputs
+            if ((nDx !== 0 && nDx === -last.dx) || (nDy !== 0 && nDy === -last.dy) || (nDx === last.dx && nDy === last.dy)) return;
+            
+            if (inputQueue.length < 2) inputQueue.push({ dx: nDx, dy: nDy });
+            
+            if (!firstMoveMade) {
+                firstMoveMade = true;
+                // Instant execution for the very first move to kill initial lag
+                move();
+                lastTickTime = performance.now();
+            }
         }
 
+        // ZERO-DELAY SLIDE SENSOR
         let anchorX, anchorY;
-        canvas.addEventListener('touchstart', (e) => { anchorX = e.touches[0].clientX; anchorY = e.touches[0].clientY; }, {passive:false});
+        canvas.addEventListener('touchstart', (e) => { 
+            anchorX = e.touches[0].clientX; 
+            anchorY = e.touches[0].clientY; 
+        }, {passive:false});
+
         canvas.addEventListener('touchmove', (e) => {
-            if (gameRunning && firstMoveMade && e.cancelable) e.preventDefault();
+            if (!gameRunning || isPaused) return;
+            if (e.cancelable) e.preventDefault();
+            
             const curX = e.touches[0].clientX, curY = e.touches[0].clientY;
             const dX = curX - anchorX, dY = curY - anchorY;
-            if (Math.abs(dX) > 25 || Math.abs(dY) > 25) {
+            
+            // Reduced threshold for much faster detection
+            const threshold = 18; 
+
+            if (Math.abs(dX) > threshold || Math.abs(dY) > threshold) {
                 if (Math.abs(dX) > Math.abs(dY)) handleInput(dX > 0 ? gridSize : -gridSize, 0);
                 else handleInput(0, dY > 0 ? gridSize : -gridSize);
-                anchorX = curX; anchorY = curY;
+                
+                // Dynamic anchor update for continuous sliding turns
+                anchorX = curX; 
+                anchorY = curY;
             }
         }, {passive:false});
 
-        const bindBtn = (id, x, y) => { document.getElementById(id).onpointerdown = (e) => { e.preventDefault(); handleInput(x, y); }; };
+        const bindBtn = (id, x, y) => { 
+            const btn = document.getElementById(id);
+            if(btn) btn.onpointerdown = (e) => { e.preventDefault(); handleInput(x, y); }; 
+        };
         bindBtn("ctrlUp", 0, -gridSize); bindBtn("ctrlDown", 0, gridSize);
         bindBtn("ctrlLeft", -gridSize, 0); bindBtn("ctrlRight", gridSize, 0);
 
         window.addEventListener('keydown', (e) => {
             const k = e.key.toLowerCase();
-            if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(e.key.toLowerCase())) { e.preventDefault(); }
+            if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) { e.preventDefault(); }
             if (k === 'w' || k === 'arrowup') handleInput(0, -gridSize);
             else if (k === 's' || k === 'arrowdown') handleInput(0, gridSize);
             else if (k === 'a' || k === 'arrowleft') handleInput(-gridSize, 0);
