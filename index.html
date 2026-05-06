@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Retro Snake | Mobile Edition</title>
+    <title>Retro Snake | Fluid Mobile</title>
     <style>
         :root { 
             --retro-bg: #808080; 
@@ -20,7 +20,8 @@
             margin: 0;
             font-family: 'Courier New', Courier, monospace;
             color: #777;
-            touch-action: manipulation; /* Prevents double-tap zoom */
+            overflow: hidden;
+            touch-action: none;
         }
         .console {
             padding: 10px;
@@ -59,11 +60,10 @@
             height: auto;
         }
 
-        /* MOBILE D-PAD */
         .d-pad {
             display: grid;
-            grid-template-columns: repeat(3, 60px);
-            grid-template-rows: repeat(3, 60px);
+            grid-template-columns: repeat(3, 65px);
+            grid-template-rows: repeat(3, 65px);
             gap: 10px;
             margin-top: 20px;
             user-select: none;
@@ -77,8 +77,8 @@
             justify-content: center;
             color: white;
             font-size: 24px;
-            font-weight: bold;
             box-shadow: 0 4px 0 #000;
+            -webkit-tap-highlight-color: transparent;
         }
         .d-btn:active {
             transform: translateY(3px);
@@ -92,8 +92,7 @@
 
         #gameOverUI {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(30, 30, 30, 0.95); 
             color: #ffffff;
@@ -108,8 +107,7 @@
 
         #settingsUI {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             background: var(--retro-ink);
             color: var(--retro-bg);
@@ -122,8 +120,7 @@
         }
         .controls {
             margin-top: 15px;
-            display: flex;
-            gap: 8px;
+            display: flex; gap: 8px;
             justify-content: center;
         }
         button {
@@ -131,18 +128,12 @@
             color: #aaa;
             border: 1px solid #444;
             padding: 8px 12px;
-            cursor: pointer;
-            font-size: 12px;
             text-transform: uppercase;
             box-shadow: 0 4px 0 #000;
-            transition: all 0.05s;
         }
         button:active { transform: translateY(2px); box-shadow: 0 2px 0 #000; }
-
-        .setting-group { margin-top: 10px; display: flex; flex-direction: column; gap: 15px; }
-        .setting-row { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 10px; }
-        .preview-box { width: 50px; height: 50px; background: var(--retro-bg); border: 2px solid #000; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
-        #previewImg { width: 35px; height: 35px; image-rendering: pixelated; }
+        .preview-box { width: 55px; height: 55px; background: var(--retro-bg); border: 2px solid #000; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+        #previewImg { width: 40px; height: 40px; image-rendering: pixelated; }
     </style>
 </head>
 <body>
@@ -163,13 +154,13 @@
             <div id="settingsUI">
                 <h3>SETTINGS</h3>
                 <div class="preview-box"><img id="previewImg" src="head.png"></div>
-                <div class="setting-group">
-                    <div class="setting-row">
-                        <label>BG COLOR</label>
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <label style="font-size: 10px;">BG COLOR</label>
                         <input type="color" id="bgColorPicker" value="#808080">
                     </div>
-                    <div class="setting-row">
-                        <label>SNAKE COLOR</label>
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <label style="font-size: 10px;">SNAKE COLOR</label>
                         <select id="snakeColorSelect" style="background:#111; color:#fff; padding:5px;">
                             <option value="charcoal">Charcoal</option>
                             <option value="classic">Classic Green</option>
@@ -190,7 +181,6 @@
         </div>
     </div>
 
-    <!-- D-PAD FOR MOBILE -->
     <div class="d-pad">
         <div class="d-btn up" id="ctrlUp">▲</div>
         <div class="d-btn left" id="ctrlLeft">◀</div>
@@ -218,7 +208,8 @@
         const imgCorner = new Image(); imgCorner.src = 'corner.png';
         const imgApple = new Image(); imgApple.src = 'apple.png';
 
-        let snake, food, goldFood, dx, dy, nextDir, score, gameRunning, isPaused, lastTickTime, firstMoveMade;
+        let snake, food, goldFood, dx, dy, score, gameRunning, isPaused, lastTickTime, firstMoveMade;
+        let inputQueue = []; // Movement Queue for fluid turns
         let highStore = localStorage.getItem('snake_hi') || 0;
         hiScoreEl.innerText = highStore;
         const moveInterval = 140;
@@ -252,11 +243,10 @@
 
         function init() {
             score = 0; scoreEl.innerText = "0";
-            dx = 0; dy = 0; nextDir = { dx: 0, dy: -gridSize }; 
+            dx = 0; dy = 0; inputQueue = [];
             snake = [{x: 200, y: 150}, {x: 200, y: 175}, {x: 200, y: 200}];
             gameRunning = true; isPaused = false; firstMoveMade = false;
-            gameOverUI.style.display = "none";
-            settingsUI.style.display = "none";
+            gameOverUI.style.display = "none"; settingsUI.style.display = "none";
             goldFood = null; lastTickTime = 0;
             spawnFood();
             requestAnimationFrame(mainLoop);
@@ -291,11 +281,10 @@
                 let angle = 0, img = imgBody;
                 if (i === 0) {
                     img = imgHead;
-                    const activeDx = firstMoveMade ? dx : nextDir.dx;
-                    const activeDy = firstMoveMade ? dy : nextDir.dy;
-                    if (activeDx === gridSize) angle = Math.PI/2;
-                    else if (activeDx === -gridSize) angle = -Math.PI/2;
-                    else if (activeDy === gridSize) angle = Math.PI;
+                    if (dx === gridSize) angle = Math.PI/2;
+                    else if (dx === -gridSize) angle = -Math.PI/2;
+                    else if (dy === gridSize) angle = Math.PI;
+                    else if (!firstMoveMade) angle = 0; // Default facing up at start
                 } else if (i === snake.length - 1) {
                     img = imgTail;
                     const relPrev = getRelativePos(part, prev);
@@ -313,21 +302,15 @@
                     } else angle = (p.x !== 0) ? Math.PI/2 : 0;
                 }
                 
-                // Shadow
-                ctx.save();
-                ctx.translate(part.x + gridSize/2 + 2, part.y + gridSize/2 + 2);
-                ctx.rotate(angle);
-                ctx.filter = "brightness(0) opacity(0.3)";
-                ctx.drawImage(img, -gridSize*overlap/2, -gridSize*overlap/2, gridSize*overlap, gridSize*overlap);
-                ctx.restore();
-
-                // Snake
-                ctx.save();
-                ctx.translate(part.x + gridSize/2, part.y + gridSize/2);
-                ctx.rotate(angle);
-                ctx.filter = currentFilter;
-                ctx.drawImage(img, -gridSize*overlap/2, -gridSize*overlap/2, gridSize*overlap, gridSize*overlap);
-                ctx.restore();
+                // Shadow & Object
+                [ {off:2, filt: "brightness(0) opacity(0.3)"}, {off:0, filt: currentFilter} ].forEach(set => {
+                    ctx.save();
+                    ctx.translate(part.x + gridSize/2 + set.off, part.y + gridSize/2 + set.off);
+                    ctx.rotate(angle);
+                    ctx.filter = set.filt;
+                    ctx.drawImage(img, -gridSize*overlap/2, -gridSize*overlap/2, gridSize*overlap, gridSize*overlap);
+                    ctx.restore();
+                });
             });
         }
 
@@ -339,7 +322,13 @@
         }
 
         function move() {
-            dx = nextDir.dx; dy = nextDir.dy;
+            // Process the next move from the queue
+            if (inputQueue.length > 0) {
+                const nextMove = inputQueue.shift();
+                dx = nextMove.dx;
+                dy = nextMove.dy;
+            }
+
             const head = { x: snake[0].x + dx, y: snake[0].y + dy };
             if (head.x < 0) head.x = canvas.width - gridSize; else if (head.x >= canvas.width) head.x = 0;
             if (head.y < 0) head.y = canvas.height - gridSize; else if (head.y >= canvas.height) head.y = 0;
@@ -354,13 +343,13 @@
         }
 
         function spawnFood() {
-            let newX, newY, valid = false;
+            let nx, ny, valid = false;
             while (!valid) {
-                newX = Math.floor(Math.random() * (canvas.width / gridSize)) * gridSize;
-                newY = Math.floor(Math.random() * (canvas.height / gridSize)) * gridSize;
-                if (!snake.some(p => p.x === newX && p.y === newY)) valid = true;
+                nx = Math.floor(Math.random() * (canvas.width / gridSize)) * gridSize;
+                ny = Math.floor(Math.random() * (canvas.height / gridSize)) * gridSize;
+                if (!snake.some(p => p.x === nx && p.y === ny)) valid = true;
             }
-            food = { x: newX, y: newY };
+            food = { x: nx, y: ny };
             if (Math.random() > 0.95) {
                 let gx, gy, vG = false;
                 while (!vG) {
@@ -373,14 +362,13 @@
         }
 
         function drawFood() {
-            ctx.save();
-            ctx.filter = "brightness(0) opacity(0.3)";
-            ctx.drawImage(imgApple, food.x + 2, food.y + 2, gridSize, gridSize);
-            ctx.restore();
-            ctx.save();
-            ctx.filter = "sepia(1) hue-rotate(-50deg) saturate(6) brightness(0.5) contrast(1.2)";
-            ctx.drawImage(imgApple, food.x, food.y, gridSize, gridSize);
-            ctx.restore();
+            // Shadow & Food
+            [ {off:2, filt: "brightness(0) opacity(0.3)"}, {off:0, filt: "sepia(1) hue-rotate(-50deg) saturate(6) brightness(0.5) contrast(1.2)"} ].forEach(set => {
+                ctx.save();
+                ctx.filter = set.filt;
+                ctx.drawImage(imgApple, food.x + set.off, food.y + set.off, gridSize, gridSize);
+                ctx.restore();
+            });
             if (goldFood) {
                 ctx.save();
                 ctx.globalAlpha = (Date.now() % 400 < 200) ? 0.3 : 1.0;
@@ -390,24 +378,48 @@
             }
         }
 
-        // MOBILE CONTROL LOGIC
         function handleInput(nDx, nDy) {
             if (!gameRunning || isPaused) return;
-            if ((nDx !== 0 && nDx === -dx) || (nDy !== 0 && nDy === -dy)) return;
-            nextDir = { dx: nDx, dy: nDy };
-            if (!firstMoveMade) firstMoveMade = true;
+            
+            // Get the last intended direction (either current or last in queue)
+            const lastPlanned = inputQueue.length > 0 ? inputQueue[inputQueue.length - 1] : { dx, dy };
+
+            // Prevent turning 180 degrees
+            if ((nDx !== 0 && nDx === -lastPlanned.dx) || (nDy !== 0 && nDy === -lastPlanned.dy)) return;
+            
+            // Prevent duplicate inputs in the queue
+            if (nDx === lastPlanned.dx && nDy === lastPlanned.dy) return;
+
+            // Only allow 2 moves in the buffer to keep it responsive
+            if (inputQueue.length < 2) {
+                inputQueue.push({ dx: nDx, dy: nDy });
+            }
+
+            if (!firstMoveMade) { firstMoveMade = true; actionBtn.innerText = "RESET"; }
         }
+
+        // TOUCH & SWIPE
+        let touchStartX = 0, touchStartY = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX; touchStartY = e.changedTouches[0].screenY;
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            const dxSwipe = e.changedTouches[0].screenX - touchStartX;
+            const dySwipe = e.changedTouches[0].screenY - touchStartY;
+            if (Math.abs(dxSwipe) > Math.abs(dySwipe)) {
+                if (Math.abs(dxSwipe) > 25) handleInput(dxSwipe > 0 ? gridSize : -gridSize, 0);
+            } else {
+                if (Math.abs(dySwipe) > 25) handleInput(0, dySwipe > 0 ? gridSize : -gridSize);
+            }
+        }, { passive: false });
 
         document.getElementById("ctrlUp").ontouchstart = (e) => { e.preventDefault(); handleInput(0, -gridSize); };
         document.getElementById("ctrlDown").ontouchstart = (e) => { e.preventDefault(); handleInput(0, gridSize); };
         document.getElementById("ctrlLeft").ontouchstart = (e) => { e.preventDefault(); handleInput(-gridSize, 0); };
         document.getElementById("ctrlRight").ontouchstart = (e) => { e.preventDefault(); handleInput(gridSize, 0); };
-
-        // FALLBACK FOR MOUSE TESTING ON DESKTOP
-        document.getElementById("ctrlUp").onclick = () => handleInput(0, -gridSize);
-        document.getElementById("ctrlDown").onclick = () => handleInput(0, gridSize);
-        document.getElementById("ctrlLeft").onclick = () => handleInput(-gridSize, 0);
-        document.getElementById("ctrlRight").onclick = () => handleInput(gridSize, 0);
+        
+        window.addEventListener('touchmove', (e) => { if (gameRunning && firstMoveMade) e.preventDefault(); }, { passive: false });
 
         actionBtn.onclick = () => init();
         pauseBtn.onclick = handlePause;
