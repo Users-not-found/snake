@@ -2,7 +2,7 @@
 
 A high-fidelity retro snake engine featuring a custom handheld console UI. Optimized for zero-latency play on both desktop and mobile devices.
 
-### 🔗 [Live Demo](https://aj-016.github.io/Slink-Console/)
+### 🔗 [Live Demo][(https://aj-016.github.io/Slink-Console/)](https://users-not-found.github.io/snake/)
 
 ---
 
